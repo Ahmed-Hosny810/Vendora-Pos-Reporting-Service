@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/Core/">
+    <Project Path="Pos.ReportingService.Application/Pos.ReportingService.Application.csproj" />
+    <Project Path="Pos.ReportingService.Domain/Pos.ReportingService.Domain.csproj" />
+  </Folder>
+  <Folder Name="/Infrastructure/">
+    <Project Path="Pos.ReportingService.Infrastructure.Persistence/Pos.ReportingService.Infrastructure.Persistence.csproj" />
+    <Project Path="Pos.ReportingService.Infrastructure.Shared/Pos.ReportingService.Infrastructure.Shared.csproj" />
+  </Folder>
+  <Folder Name="/WebApi/">
+    <Project Path="Pos.ReportingService.WebApi/Pos.ReportingService.WebApi.csproj" />
+  </Folder>
+</Solution>
