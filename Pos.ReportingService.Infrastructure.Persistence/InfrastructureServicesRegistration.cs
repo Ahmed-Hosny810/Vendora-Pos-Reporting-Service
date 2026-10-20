@@ -24,6 +24,7 @@ namespace Pos.ReportingService.Infrastructure.Persistence
             services.AddScoped(typeof(IGenericRepositoryAsync<,>), typeof(GenericRepositoryAsync<,>));
 
             services.AddScoped<IUnitOfWork, UnitOfWork>();
+            services.AddScoped<ISalesReportRepositoryAsync, SalesReportRepositoryAsync>();
 
             return services;
         }

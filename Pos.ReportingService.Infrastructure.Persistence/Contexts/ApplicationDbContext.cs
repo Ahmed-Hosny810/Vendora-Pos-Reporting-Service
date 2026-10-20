@@ -27,10 +27,16 @@ public class ApplicationDbContext : DbContext
     public DbSet<LowStockAlertReadModel> LowStockAlerts => Set<LowStockAlertReadModel>();
     public DbSet<InventorySnapshot> InventorySnapshots => Set<InventorySnapshot>();
 
+    public DbSet<ProductReadModel> Products => Set<ProductReadModel>();
+    public DbSet<ProductVariantReadModel> ProductVariants => Set<ProductVariantReadModel>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
+
+        modelBuilder.Entity<ProductReadModel>().HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        modelBuilder.Entity<ProductVariantReadModel>().HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
 
         // Missing tenant context returns no data. Background jobs must use explicit tenant scoping.
         modelBuilder.Entity<SaleReadModel>().HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);

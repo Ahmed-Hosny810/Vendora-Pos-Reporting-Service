@@ -8,7 +8,7 @@ public class SaleReturnItemReadModelConfiguration : IEntityTypeConfiguration<Sal
 {
     public void Configure(EntityTypeBuilder<SaleReturnItemReadModel> builder)
     {
-        // Read the existing source table; Reporting migrations must not create or alter it.
+        // Read the existing source table;
         builder.HasNoKey();
         builder.ToView("ReturnItems", "sales");
         builder.Property(x => x.Quantity).HasPrecision(18, 3);

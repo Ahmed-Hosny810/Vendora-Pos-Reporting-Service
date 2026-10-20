@@ -8,7 +8,7 @@ public class SaleReturnReadModelConfiguration : IEntityTypeConfiguration<SaleRet
 {
     public void Configure(EntityTypeBuilder<SaleReturnReadModel> builder)
     {
-        // Read the existing source table; Reporting migrations must not create or alter it.
+        // Read the existing source table;
         builder.HasNoKey();
         builder.ToView("Returns", "sales");
         builder.Property(x => x.RefundAmount).HasPrecision(18, 2);

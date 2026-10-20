@@ -8,7 +8,7 @@ public class LowStockAlertReadModelConfiguration : IEntityTypeConfiguration<LowS
 {
     public void Configure(EntityTypeBuilder<LowStockAlertReadModel> builder)
     {
-        // Read the existing source table; Reporting migrations must not create or alter it.
+        // Read the existing source table;
         builder.HasNoKey();
         builder.ToView("LowStockAlerts", "inventory");
         builder.Property(x => x.QuantityOnHand).HasPrecision(18, 3);

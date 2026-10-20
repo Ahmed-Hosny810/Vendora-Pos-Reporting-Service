@@ -8,7 +8,7 @@ public class StockBalanceReadModelConfiguration : IEntityTypeConfiguration<Stock
 {
     public void Configure(EntityTypeBuilder<StockBalanceReadModel> builder)
     {
-        // Read the existing source table; Reporting migrations must not create or alter it.
+        // Read the existing source table;
         builder.HasNoKey();
         builder.ToView("StockBalances", "inventory");
         builder.Property(x => x.QuantityOnHand).HasPrecision(18, 3);

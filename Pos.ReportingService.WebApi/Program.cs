@@ -1,3 +1,4 @@
+using Pos.ReportingService.WebApi.Policies;
 using Pos.ReportingService.Application;
 using Pos.ReportingService.Application.Interfaces.Services;
 using Pos.ReportingService.Infrastructure.Persistence;
@@ -39,6 +40,7 @@ namespace Pos.ReportingService.WebApi
             builder.Services.AddApplicationLayer(builder.Configuration);
 
             builder.Services.AddAuthenticationServices(builder.Configuration);
+            builder.Services.AddAppPolicies();
 
             builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 

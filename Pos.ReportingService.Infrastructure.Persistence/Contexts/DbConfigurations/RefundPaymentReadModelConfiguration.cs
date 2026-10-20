@@ -8,7 +8,7 @@ public class RefundPaymentReadModelConfiguration : IEntityTypeConfiguration<Refu
 {
     public void Configure(EntityTypeBuilder<RefundPaymentReadModel> builder)
     {
-        // Read the existing source table; Reporting migrations must not create or alter it.
+        // Read the existing source table;
         builder.HasNoKey();
         builder.ToView("RefundPayments", "sales");
         builder.Property(x => x.Amount).HasPrecision(18, 2);

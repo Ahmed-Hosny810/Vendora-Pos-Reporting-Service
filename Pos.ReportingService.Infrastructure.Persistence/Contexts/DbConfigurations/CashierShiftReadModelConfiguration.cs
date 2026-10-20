@@ -8,7 +8,7 @@ public class CashierShiftReadModelConfiguration : IEntityTypeConfiguration<Cashi
 {
     public void Configure(EntityTypeBuilder<CashierShiftReadModel> builder)
     {
-        // Read the existing source table; Reporting migrations must not create or alter it.
+        // Read the existing source table;
         builder.HasNoKey();
         builder.ToView("CashierShifts", "sales");
         builder.Property(x => x.OpeningCash).HasPrecision(18, 2);

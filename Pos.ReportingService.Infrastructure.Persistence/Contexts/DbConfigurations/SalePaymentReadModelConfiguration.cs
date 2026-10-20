@@ -8,7 +8,7 @@ public class SalePaymentReadModelConfiguration : IEntityTypeConfiguration<SalePa
 {
     public void Configure(EntityTypeBuilder<SalePaymentReadModel> builder)
     {
-        // Read the existing source table; Reporting migrations must not create or alter it.
+        // Read the existing source table; 
         builder.HasNoKey();
         builder.ToView("SalePayments", "sales");
         builder.Property(x => x.Amount).HasPrecision(18, 2);
