@@ -1,3 +1,4 @@
+using Pos.ReportingService.Application.Features.SalesReports.Queries.GetBranchSalesReportQuery;
 using Asp.Versioning;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -86,6 +87,23 @@ public class ReportsController : ControllerBase
                 {
                     Errors = exception.Errors
                 });
+        }
+    }
+
+    [HttpGet("branch-sales")]
+    public async Task<ActionResult<PagedResponse<IEnumerable<BranchSalesReportDto>>>> GetBranchSalesReport(
+        [FromQuery] GetBranchSalesReportQueryParameter parameter, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _mediator.Send(new GetBranchSalesReportQuery { Parameter = parameter }, cancellationToken);
+            return result.IsSuccess
+                ? Ok(result.Value)
+                : BadRequest(new Response<IEnumerable<BranchSalesReportDto>>(string.Join(", ", result.Errors)) { Errors = result.Errors });
+        }
+        catch (Application.Exceptions.ValidationException exception)
+        {
+            return BadRequest(new Response<IEnumerable<BranchSalesReportDto>>(exception.Message) { Errors = exception.Errors });
         }
     }
 }

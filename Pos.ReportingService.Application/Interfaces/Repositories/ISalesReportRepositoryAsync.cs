@@ -1,3 +1,4 @@
+using Pos.ReportingService.Application.Features.SalesReports.Queries.GetBranchSalesReportQuery;
 using Pos.ReportingService.Application.Features.SalesReports.Queries.GetProductSalesReportQuery;
 using Pos.SalesService.Application.Wrappers;
 using Pos.ReportingService.Application.Features.SalesReports.DTOs;
@@ -12,4 +13,6 @@ public interface ISalesReportRepositoryAsync
     Task<IReadOnlyList<DailySalesReportDto>> GetDailySalesReportAsync(Guid tenantId, SalesReportFilter filter, CancellationToken cancellationToken);
     Task<PagedResponse<IEnumerable<ProductSalesReportDto>>> GetProductSalesReportAsync(
         Guid tenantId, GetProductSalesReportQueryParameter parameter, CancellationToken cancellationToken);
+    Task<PagedResponse<IEnumerable<BranchSalesReportDto>>> GetBranchSalesReportAsync(
+        Guid tenantId, GetBranchSalesReportQueryParameter parameter, CancellationToken cancellationToken);
 }

@@ -30,9 +30,12 @@ public class ApplicationDbContext : DbContext
     public DbSet<ProductReadModel> Products => Set<ProductReadModel>();
     public DbSet<ProductVariantReadModel> ProductVariants => Set<ProductVariantReadModel>();
 
+    public DbSet<BranchReadModel> Branches => Set<BranchReadModel>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        modelBuilder.Entity<BranchReadModel>().HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
 
         modelBuilder.Entity<ProductReadModel>().HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);

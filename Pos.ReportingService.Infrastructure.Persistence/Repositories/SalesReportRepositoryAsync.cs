@@ -1,3 +1,4 @@
+using Pos.ReportingService.Application.Features.SalesReports.Queries.GetBranchSalesReportQuery;
 using Pos.ReportingService.Application.Features.SalesReports.Queries.GetProductSalesReportQuery;
 using Pos.SalesService.Application.Wrappers;
 using Microsoft.EntityFrameworkCore;
@@ -116,6 +117,77 @@ public class SalesReportRepositoryAsync : ISalesReportRepositoryAsync
             rows, parameter.PageNumber, parameter.PageSize, totalCount);
     }
 
+    public async Task<PagedResponse<IEnumerable<BranchSalesReportDto>>> GetBranchSalesReportAsync(
+        Guid tenantId, GetBranchSalesReportQueryParameter parameter, CancellationToken cancellationToken)
+    {
+        var report = BuildBranchSalesReportQuery(tenantId, parameter.Filter);
+
+        var totalCount = await report.CountAsync(cancellationToken);
+
+        var offset = ((long)parameter.PageNumber - 1) * parameter.PageSize;
+
+        if (offset >= totalCount)
+            return new PagedResponse<IEnumerable<BranchSalesReportDto>>(
+                Array.Empty<BranchSalesReportDto>(), parameter.PageNumber, parameter.PageSize, totalCount);
+
+        var rows = await report
+            .ApplyOrder(parameter)
+            .Skip((int)offset)
+            .Take(parameter.PageSize)
+            .ToListAsync(cancellationToken);
+
+        var branchIds = rows.Select(x => x.BranchId).ToList();
+
+        var names = await _context.Branches.Where(x => x.TenantId == tenantId && branchIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, x => x.NameEn, cancellationToken);
+
+        foreach (var row in rows)
+            row.BranchName = names.GetValueOrDefault(row.BranchId) ?? $"Unavailable branch ({row.BranchId})";
+
+        return new PagedResponse<IEnumerable<BranchSalesReportDto>>(
+            rows, parameter.PageNumber, parameter.PageSize, totalCount);
+    }
+
+    private IQueryable<BranchSalesReportDto> BuildBranchSalesReportQuery(Guid tenantId, SalesReportFilter filter)
+    {
+        var sales = _context.Sales.ApplySalesFilter(tenantId, filter)
+            .GroupBy(x => x.BranchId)
+            .Select(group => new
+            {
+                BranchId = group.Key,
+                Count = group.Count(),
+                Total = group.Sum(x => x.Total),
+                Discount = group.Sum(x => x.DiscountTotal),
+                Tax = group.Sum(x => x.TaxTotal),
+                Returns = 0m
+            });
+        // Returns belong to their receiving branch and their own completion period.
+        var returns = _context.Returns.ApplyReturnsFilter(_context.Sales, tenantId, filter)
+            .GroupBy(x => x.BranchId)
+            .Select(group => new
+            {
+                BranchId = group.Key,
+                Count = 0,
+                Total = 0m,
+                Discount = 0m,
+                Tax = 0m,
+                Returns = group.Sum(x => x.RefundAmount)
+            });
+
+        return sales.Concat(returns).GroupBy(x => x.BranchId)
+            .Select(group => new BranchSalesReportDto
+            {
+                BranchId = group.Key,
+                CurrencyCode = filter.CurrencyCode,
+                CompletedSaleCount = group.Sum(x => x.Count),
+                SalesTotal = group.Sum(x => x.Total),
+                DiscountTotal = group.Sum(x => x.Discount),
+                SalesTaxTotal = group.Sum(x => x.Tax),
+                AcceptedReturnAmount = group.Sum(x => x.Returns),
+                SalesTotalAfterReturns = group.Sum(x => x.Total) - group.Sum(x => x.Returns)
+            });
+    }
+
     private IQueryable<ProductSalesContribution> BuildProductSalesQuery(Guid tenantId, ProductSalesReportFilter filter)
     {
         var sales = _context.Sales.ApplySalesFilter(tenantId, filter);
@@ -221,4 +293,5 @@ public class SalesReportRepositoryAsync : ISalesReportRepositoryAsync
         public decimal SalesTaxTotal { get; set; }
         public decimal ReturnAmount { get; set; }
     }
+
 }
