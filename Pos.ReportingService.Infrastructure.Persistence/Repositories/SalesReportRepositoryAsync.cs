@@ -1,3 +1,5 @@
+using Pos.ReportingService.Application.Features.SalesReports.Queries.GetReturnsRefundsReportQuery;
+using Pos.ReportingService.Application.Features.SalesReports.Queries.GetPaymentMethodReportQuery;
 using Pos.ReportingService.Application.Features.SalesReports.Queries.GetCashierSalesReportQuery;
 using Pos.ReportingService.Application.Features.SalesReports.Queries.GetBranchSalesReportQuery;
 using Pos.ReportingService.Application.Features.SalesReports.Queries.GetProductSalesReportQuery;
@@ -8,6 +10,7 @@ using Pos.ReportingService.Application.Features.SalesReports.Parameters;
 using Pos.ReportingService.Application.Interfaces.Repositories;
 using Pos.ReportingService.Infrastructure.Persistence.Contexts;
 using Pos.ReportingService.Infrastructure.Persistence.QueryExtensions;
+using Pos.ReportingService.Infrastructure.Persistence.ReadModels.Constants;
 
 namespace Pos.ReportingService.Infrastructure.Persistence.Repositories;
 
@@ -55,7 +58,7 @@ public class SalesReportRepositoryAsync : ISalesReportRepositoryAsync
             return new DailySalesReportDto
             {
                 Date = DateOnly.FromDateTime(d),
-                CurrencyCode = filter.CurrencyCode,
+                CurrencyCode = filter.CurrencyCode ?? "EGP",
                 CompletedSaleCount = s?.Count ?? 0,
                 SalesTotal = salesTotal,
                 DiscountTotal = s?.Discount ?? 0m,
@@ -80,7 +83,7 @@ public class SalesReportRepositoryAsync : ISalesReportRepositoryAsync
                 DiscountTotal = group.Sum(x => x.DiscountTotal),
                 SalesTaxTotal = group.Sum(x => x.TaxTotal)
             }).SingleOrDefaultAsync(cancellationToken)
-            ?? new SalesDashboardDto { CurrencyCode = filter.CurrencyCode };
+            ?? new SalesDashboardDto { CurrencyCode = filter.CurrencyCode ?? "EGP" };
 
 
         result.AcceptedReturnAmount = await _context.Returns
@@ -99,7 +102,7 @@ public class SalesReportRepositoryAsync : ISalesReportRepositoryAsync
 
         var returns = BuildProductReturnsQuery(tenantId, parameter.Filter);
 
-        var report = BuildProductReportQuery(sales.Concat(returns), parameter.Filter.CurrencyCode);
+        var report = BuildProductReportQuery(sales.Concat(returns), parameter.Filter.CurrencyCode ?? "EGP");
 
         var totalCount = await report.CountAsync(cancellationToken);
 
@@ -166,7 +169,7 @@ public class SalesReportRepositoryAsync : ISalesReportRepositoryAsync
             select new CashierSalesReportDto
             {
                 CashierUserId = cashier.Key,
-                CurrencyCode = parameter.Filter.CurrencyCode,
+                CurrencyCode = parameter.Filter.CurrencyCode ?? "EGP",
                 CompletedSaleCount = cashier.Count(),
                 SalesTotal = cashier.Sum(s => s.Total),
                 DiscountTotal = cashier.Sum(s => s.DiscountTotal),
@@ -193,6 +196,74 @@ public class SalesReportRepositoryAsync : ISalesReportRepositoryAsync
             parameter.PageSize,
             totalCount);
     }
+
+    public async Task<PagedResponse<IEnumerable<PaymentMethodReportDto>>> GetPaymentMethodReportAsync(
+        Guid tenantId, GetPaymentMethodReportQueryParameter parameter, CancellationToken cancellationToken)
+    {
+        var query = BuildPaymentMethodReportQuery(tenantId, parameter.Filter);
+
+        var offset = ((long)parameter.PageNumber - 1) * parameter.PageSize;
+
+        // Skip accepts int; an offset beyond that cannot contain rows under our int count contract.
+        if (offset > int.MaxValue)
+            return new PagedResponse<IEnumerable<PaymentMethodReportDto>>(
+                Array.Empty<PaymentMethodReportDto>(), parameter.PageNumber, parameter.PageSize,
+                await query.CountAsync(cancellationToken));
+
+        var rows = await query
+            .ApplyOrder(parameter)
+            .Skip((int)offset)
+            .Take(parameter.PageSize)
+            .ToListAsync(cancellationToken);
+
+        var totalCountIsKnown = (rows.Count > 0 && rows.Count < parameter.PageSize) ||
+            (rows.Count == 0 && offset == 0);
+
+        var totalCount = totalCountIsKnown
+            ? checked((int)(offset + rows.Count))
+            : await query.CountAsync(cancellationToken);
+
+        return new PagedResponse<IEnumerable<PaymentMethodReportDto>>(
+            rows, parameter.PageNumber, parameter.PageSize, totalCount);
+    }
+
+    public async Task<PagedResponse<IEnumerable<ReturnsRefundsReportDto>>> GetReturnsRefundsReportAsync(
+        Guid tenantId, GetReturnsRefundsReportQueryParameter parameter, CancellationToken cancellationToken)
+    {
+        var query = BuildReturnsRefundsReportQuery(tenantId, parameter.Filter)
+            .ApplyRefundStateFilter(parameter.Filter);
+
+        var offset = ((long)parameter.PageNumber - 1) * parameter.PageSize;
+
+        if (offset > int.MaxValue)
+            return new PagedResponse<IEnumerable<ReturnsRefundsReportDto>>(
+                Array.Empty<ReturnsRefundsReportDto>(), parameter.PageNumber, parameter.PageSize,
+                await query.CountAsync(cancellationToken));
+
+        var rows = await query.ApplyOrder(parameter).Skip((int)offset)
+            .Take(parameter.PageSize).ToListAsync(cancellationToken);
+
+        // A short nonempty page or empty first page reveals the total.
+        var totalCountIsKnown = (rows.Count > 0 && rows.Count < parameter.PageSize) ||
+            (rows.Count == 0 && offset == 0);
+
+        var totalCount = totalCountIsKnown
+            ? checked((int)(offset + rows.Count)) : await query.CountAsync(cancellationToken);
+
+        if (rows.Count > 0)
+        {
+            var branchIds = rows.Select(x => x.BranchId).Distinct().ToList();
+            var names = await _context.Branches
+                .Where(x => x.TenantId == tenantId && branchIds.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, x => x.NameEn, cancellationToken);
+            foreach (var row in rows)
+                row.BranchName = names.GetValueOrDefault(row.BranchId) ?? $"Unavailable branch ({row.BranchId})";
+        }
+
+        return new PagedResponse<IEnumerable<ReturnsRefundsReportDto>>(
+            rows, parameter.PageNumber, parameter.PageSize, totalCount);
+    }
+
 
     // Helpers 
 
@@ -226,7 +297,7 @@ public class SalesReportRepositoryAsync : ISalesReportRepositoryAsync
             .Select(group => new BranchSalesReportDto
             {
                 BranchId = group.Key,
-                CurrencyCode = filter.CurrencyCode,
+                CurrencyCode = filter.CurrencyCode ?? "EGP",
                 CompletedSaleCount = group.Sum(x => x.Count),
                 SalesTotal = group.Sum(x => x.Total),
                 DiscountTotal = group.Sum(x => x.Discount),
@@ -330,6 +401,92 @@ public class SalesReportRepositoryAsync : ISalesReportRepositoryAsync
         }
     }
 
+    private IQueryable<PaymentMethodReportDto> BuildPaymentMethodReportQuery(Guid tenantId, SalesReportFilter filter)
+    {
+        // Collections use payment time, even if the sale was completed outside the requested period.
+        var payments =
+            from payment in _context.SalePayments.ApplyPaymentFilter(tenantId, filter)
+            join sale in _context.Sales.Where(x => x.TenantId == tenantId &&
+                x.CurrencyCode == filter.CurrencyCode &&
+                (!filter.BranchId.HasValue || x.BranchId == filter.BranchId.Value))
+                on new { payment.TenantId, Id = payment.SaleId }
+                equals new { sale.TenantId, sale.Id }
+            select new
+            {
+                payment.PaymentMethodId,
+                Name = payment.PaymentMethodNameSnapshot,
+                Count = 1,
+                Collected = payment.Amount - payment.ChangeAmount,
+                Refunded = 0m
+            };
+
+        // Refund currency comes from the original sale; branch comes from the shift paying the refund.
+        var refunds =
+            from payment in _context.RefundPayments.ApplyPaymentFilter(tenantId, filter)
+            join returned in _context.Returns.Where(x => x.TenantId == tenantId)
+                on new { payment.TenantId, Id = payment.ReturnId } equals new { returned.TenantId, returned.Id }
+            join sale in _context.Sales.Where(x => x.TenantId == tenantId && x.CurrencyCode == filter.CurrencyCode)
+                on new { returned.TenantId, Id = returned.OriginalSaleId } equals new { sale.TenantId, sale.Id }
+            join shift in _context.CashierShifts.Where(x => x.TenantId == tenantId &&
+                (!filter.BranchId.HasValue || x.BranchId == filter.BranchId.Value))
+                on new { payment.TenantId, Id = payment.ShiftId } equals new { shift.TenantId, shift.Id }
+            select new
+            {
+                payment.PaymentMethodId,
+                Name = payment.PaymentMethodNameSnapshot,
+                Count = 0,
+                Collected = 0m,
+                Refunded = payment.Amount
+            };
+
+        return payments.Concat(refunds)
+            .GroupBy(x => x.PaymentMethodId)
+            .Select(group => new PaymentMethodReportDto
+            {
+                PaymentMethodId = group.Key,
+                PaymentMethodName = group.Max(x => x.Name)!,
+                CurrencyCode = filter.CurrencyCode ?? "EGP",
+                CompletedPaymentCount = group.Sum(x => x.Count),
+                CollectedAmount = group.Sum(x => x.Collected),
+                RefundAmount = group.Sum(x => x.Refunded),
+                NetCollectedAmount = group.Sum(x => x.Collected) - group.Sum(x => x.Refunded)
+            });
+    }
+    
+    private IQueryable<ReturnsRefundsReportDto> BuildReturnsRefundsReportQuery(
+        Guid tenantId, SalesReportFilter filter)
+    {
+        // Select by return date; refund payments deliberately have no date or paying-branch filter.
+        var returns = _context.Returns.ApplyReturnsFilter(_context.Sales, tenantId, filter);
+
+        return
+            from returned in returns
+            join sale in _context.Sales.Where(x => x.TenantId == tenantId)
+                on new { returned.TenantId, Id = returned.OriginalSaleId }
+                equals new { sale.TenantId, sale.Id }
+            let refundedAmount = _context.RefundPayments
+                .Where(x => x.TenantId == tenantId && x.ReturnId == returned.Id &&
+                    x.Status == PaymentStatuses.Completed)
+                .Sum(x => (decimal?)x.Amount) ?? 0m
+            select new ReturnsRefundsReportDto
+            {
+                ReturnId = returned.Id,
+                ReturnNumber = returned.ReturnNumber,
+                OriginalSaleId = returned.OriginalSaleId,
+                OriginalReceiptNumber = sale.ReceiptNumber,
+                CompletedAt = returned.CompletedAt,
+                BranchId = returned.BranchId,
+                ProcessedByUserId = returned.ProcessedByUserId,
+                CurrencyCode = sale.CurrencyCode,
+                AuthorizedRefundAmount = returned.RefundAmount,
+                RefundedAmount = refundedAmount,
+                RemainingRefundAmount = returned.RefundAmount - refundedAmount,
+                // A zero-value return has no outstanding refund.
+                RefundState = refundedAmount >= returned.RefundAmount ? RefundStates.FullyRefunded
+                    : refundedAmount == 0m ? RefundStates.Unpaid : RefundStates.PartiallyRefunded
+            };
+    }
+
     private sealed class ProductSalesContribution
     {
         public Guid ProductId { get; set; }
@@ -341,5 +498,4 @@ public class SalesReportRepositoryAsync : ISalesReportRepositoryAsync
         public decimal SalesTaxTotal { get; set; }
         public decimal ReturnAmount { get; set; }
     }
-
 }

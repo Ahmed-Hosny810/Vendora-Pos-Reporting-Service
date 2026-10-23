@@ -1,3 +1,5 @@
+using Pos.ReportingService.Application.Features.SalesReports.Queries.GetReturnsRefundsReportQuery;
+using Pos.ReportingService.Application.Features.SalesReports.Queries.GetPaymentMethodReportQuery;
 using Pos.ReportingService.Application.Features.SalesReports.Queries.GetCashierSalesReportQuery;
 using Pos.ReportingService.Application.Features.SalesReports.Queries.GetBranchSalesReportQuery;
 using Asp.Versioning;
@@ -121,6 +123,38 @@ public class ReportsController : ControllerBase
         catch (Application.Exceptions.ValidationException exception)
         {
             return BadRequest(new Response<IEnumerable<CashierSalesReportDto>>(exception.Message) { Errors = exception.Errors });
+        }
+    }
+    [HttpGet("payment-methods")]
+    public async Task<ActionResult<PagedResponse<IEnumerable<PaymentMethodReportDto>>>> GetPaymentMethodReport(
+        [FromQuery] GetPaymentMethodReportQueryParameter parameter, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _mediator.Send(new GetPaymentMethodReportQuery { Parameter = parameter }, cancellationToken);
+            return result.IsSuccess
+                ? Ok(result.Value)
+                : BadRequest(new Response<IEnumerable<PaymentMethodReportDto>>(string.Join(", ", result.Errors)) { Errors = result.Errors });
+        }
+        catch (Application.Exceptions.ValidationException exception)
+        {
+            return BadRequest(new Response<IEnumerable<PaymentMethodReportDto>>(exception.Message) { Errors = exception.Errors });
+        }
+    }
+    [HttpGet("returns-refunds")]
+    public async Task<ActionResult<PagedResponse<IEnumerable<ReturnsRefundsReportDto>>>> GetReturnsRefundsReport(
+        [FromQuery] GetReturnsRefundsReportQueryParameter parameter, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _mediator.Send(new GetReturnsRefundsReportQuery { Parameter = parameter }, cancellationToken);
+            return result.IsSuccess
+                ? Ok(result.Value)
+                : BadRequest(new Response<IEnumerable<ReturnsRefundsReportDto>>(string.Join(", ", result.Errors)) { Errors = result.Errors });
+        }
+        catch (Application.Exceptions.ValidationException exception)
+        {
+            return BadRequest(new Response<IEnumerable<ReturnsRefundsReportDto>>(exception.Message) { Errors = exception.Errors });
         }
     }
 }

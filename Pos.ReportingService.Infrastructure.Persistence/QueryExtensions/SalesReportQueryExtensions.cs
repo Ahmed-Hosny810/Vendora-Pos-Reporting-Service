@@ -8,12 +8,12 @@ public static class SalesReportQueryExtensions
 {
     public static IQueryable<SaleReadModel> ApplySalesFilter(this IQueryable<SaleReadModel> query, Guid tenantId, SalesReportFilter filter)
     {
-        var from = filter.FromUtc.UtcDateTime;
-        var to = filter.ToUtcExclusive.UtcDateTime;
+        var from = filter.FromUtc?.UtcDateTime;
+        var to = filter.ToUtcExclusive?.UtcDateTime;
 
         return query.Where(x => x.TenantId == tenantId &&
             (x.Status == SaleStatuses.Completed || x.Status == SaleStatuses.PartiallyReturned || x.Status == SaleStatuses.Returned) &&
-            x.CompletedAt >= from && x.CompletedAt < to &&
+            (!from.HasValue || x.CompletedAt >= from.Value) && (!to.HasValue || x.CompletedAt < to.Value) &&
             x.CurrencyCode == filter.CurrencyCode &&
             (!filter.BranchId.HasValue || x.BranchId == filter.BranchId.Value));
     }
@@ -24,11 +24,11 @@ public static class SalesReportQueryExtensions
         Guid tenantId,
         SalesReportFilter filter)
     {
-        var from = filter.FromUtc.UtcDateTime;
-        var to = filter.ToUtcExclusive.UtcDateTime;
+        var from = filter.FromUtc?.UtcDateTime;
+        var to = filter.ToUtcExclusive?.UtcDateTime;
 
         return query.Where(r =>r.TenantId == tenantId &&
-            r.CompletedAt >= from && r.CompletedAt < to &&
+            (!from.HasValue || r.CompletedAt >= from.Value) && (!to.HasValue || r.CompletedAt < to.Value) &&
             (!filter.BranchId.HasValue || r.BranchId == filter.BranchId.Value) &&
             sales.Any(s => s.Id == r.OriginalSaleId &&
                            s.TenantId == tenantId &&
