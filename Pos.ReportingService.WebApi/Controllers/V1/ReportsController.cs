@@ -1,3 +1,4 @@
+using Pos.ReportingService.Application.Features.SalesReports.Queries.GetCashierSalesReportQuery;
 using Pos.ReportingService.Application.Features.SalesReports.Queries.GetBranchSalesReportQuery;
 using Asp.Versioning;
 using MediatR;
@@ -104,6 +105,22 @@ public class ReportsController : ControllerBase
         catch (Application.Exceptions.ValidationException exception)
         {
             return BadRequest(new Response<IEnumerable<BranchSalesReportDto>>(exception.Message) { Errors = exception.Errors });
+        }
+    }
+    [HttpGet("cashier-sales")]
+    public async Task<ActionResult<PagedResponse<IEnumerable<CashierSalesReportDto>>>> GetCashierSalesReport(
+        [FromQuery] GetCashierSalesReportQueryParameter parameter, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _mediator.Send(new GetCashierSalesReportQuery { Parameter = parameter }, cancellationToken);
+            return result.IsSuccess
+                ? Ok(result.Value)
+                : BadRequest(new Response<IEnumerable<CashierSalesReportDto>>(string.Join(", ", result.Errors)) { Errors = result.Errors });
+        }
+        catch (Application.Exceptions.ValidationException exception)
+        {
+            return BadRequest(new Response<IEnumerable<CashierSalesReportDto>>(exception.Message) { Errors = exception.Errors });
         }
     }
 }

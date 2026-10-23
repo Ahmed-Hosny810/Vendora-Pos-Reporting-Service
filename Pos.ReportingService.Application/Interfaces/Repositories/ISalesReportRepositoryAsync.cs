@@ -1,3 +1,4 @@
+using Pos.ReportingService.Application.Features.SalesReports.Queries.GetCashierSalesReportQuery;
 using Pos.ReportingService.Application.Features.SalesReports.Queries.GetBranchSalesReportQuery;
 using Pos.ReportingService.Application.Features.SalesReports.Queries.GetProductSalesReportQuery;
 using Pos.SalesService.Application.Wrappers;
@@ -15,4 +16,6 @@ public interface ISalesReportRepositoryAsync
         Guid tenantId, GetProductSalesReportQueryParameter parameter, CancellationToken cancellationToken);
     Task<PagedResponse<IEnumerable<BranchSalesReportDto>>> GetBranchSalesReportAsync(
         Guid tenantId, GetBranchSalesReportQueryParameter parameter, CancellationToken cancellationToken);
+    Task<PagedResponse<IEnumerable<CashierSalesReportDto>>> GetCashierSalesReportAsync(
+        Guid tenantId, GetCashierSalesReportQueryParameter parameter, CancellationToken cancellationToken);
 }

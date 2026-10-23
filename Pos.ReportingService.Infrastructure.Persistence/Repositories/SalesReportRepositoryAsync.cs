@@ -1,3 +1,4 @@
+using Pos.ReportingService.Application.Features.SalesReports.Queries.GetCashierSalesReportQuery;
 using Pos.ReportingService.Application.Features.SalesReports.Queries.GetBranchSalesReportQuery;
 using Pos.ReportingService.Application.Features.SalesReports.Queries.GetProductSalesReportQuery;
 using Pos.SalesService.Application.Wrappers;
@@ -147,6 +148,53 @@ public class SalesReportRepositoryAsync : ISalesReportRepositoryAsync
         return new PagedResponse<IEnumerable<BranchSalesReportDto>>(
             rows, parameter.PageNumber, parameter.PageSize, totalCount);
     }
+
+    public async Task<PagedResponse<IEnumerable<CashierSalesReportDto>>> GetCashierSalesReportAsync(
+        Guid tenantId, GetCashierSalesReportQueryParameter parameter, CancellationToken cancellationToken)
+    {
+
+        var sales = _context.Sales.ApplySalesFilter(tenantId, parameter.Filter);
+
+        var shifts = _context.CashierShifts.ApplyCashierFilter(tenantId, parameter.Filter);
+
+        var query =
+            from sale in sales
+            join shift in shifts
+            on new { sale.TenantId, ShiftId = sale.ShiftId }
+            equals new { shift.TenantId, ShiftId = shift.Id }
+            group sale by shift.CashierUserId into cashier
+            select new CashierSalesReportDto
+            {
+                CashierUserId = cashier.Key,
+                CurrencyCode = parameter.Filter.CurrencyCode,
+                CompletedSaleCount = cashier.Count(),
+                SalesTotal = cashier.Sum(s => s.Total),
+                DiscountTotal = cashier.Sum(s => s.DiscountTotal),
+                SalesTaxTotal = cashier.Sum(s => s.TaxTotal)
+            };
+
+        var offset = (parameter.PageNumber - 1) * parameter.PageSize;
+
+        var rows = await query.ApplyOrder(parameter)
+            .Skip(offset).Take(parameter.PageSize)
+            .ToListAsync(cancellationToken);
+
+        var totalCountIsKnown =
+            (rows.Count > 0 && rows.Count < parameter.PageSize) ||   
+            (rows.Count == 0 && offset == 0);                        
+
+        var totalCount = totalCountIsKnown
+            ? offset + rows.Count
+            : await query.CountAsync(cancellationToken);
+
+        return new PagedResponse<IEnumerable<CashierSalesReportDto>>(
+            rows,
+            parameter.PageNumber,
+            parameter.PageSize,
+            totalCount);
+    }
+
+    // Helpers 
 
     private IQueryable<BranchSalesReportDto> BuildBranchSalesReportQuery(Guid tenantId, SalesReportFilter filter)
     {
