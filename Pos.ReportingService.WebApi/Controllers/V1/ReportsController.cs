@@ -1,3 +1,4 @@
+using Pos.ReportingService.Application.Features.SalesReports.Queries.GetShiftReconciliationReportQuery;
 using Pos.ReportingService.Application.Features.SalesReports.Queries.GetReturnsRefundsReportQuery;
 using Pos.ReportingService.Application.Features.SalesReports.Queries.GetPaymentMethodReportQuery;
 using Pos.ReportingService.Application.Features.SalesReports.Queries.GetCashierSalesReportQuery;
@@ -155,6 +156,22 @@ public class ReportsController : ControllerBase
         catch (Application.Exceptions.ValidationException exception)
         {
             return BadRequest(new Response<IEnumerable<ReturnsRefundsReportDto>>(exception.Message) { Errors = exception.Errors });
+        }
+    }
+    [HttpGet("shift-reconciliation")]
+    public async Task<ActionResult<PagedResponse<IEnumerable<ShiftReconciliationReportDto>>>> GetShiftReconciliationReport(
+        [FromQuery] GetShiftReconciliationReportQueryParameter parameter, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _mediator.Send(new GetShiftReconciliationReportQuery { Parameter = parameter }, cancellationToken);
+            return result.IsSuccess
+                ? Ok(result.Value)
+                : BadRequest(new Response<IEnumerable<ShiftReconciliationReportDto>>(string.Join(", ", result.Errors)) { Errors = result.Errors });
+        }
+        catch (Application.Exceptions.ValidationException exception)
+        {
+            return BadRequest(new Response<IEnumerable<ShiftReconciliationReportDto>>(exception.Message) { Errors = exception.Errors });
         }
     }
 }

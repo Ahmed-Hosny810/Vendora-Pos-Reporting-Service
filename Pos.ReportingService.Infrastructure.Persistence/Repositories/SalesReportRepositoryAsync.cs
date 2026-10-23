@@ -1,3 +1,4 @@
+using Pos.ReportingService.Application.Features.SalesReports.Queries.GetShiftReconciliationReportQuery;
 using Pos.ReportingService.Application.Features.SalesReports.Queries.GetReturnsRefundsReportQuery;
 using Pos.ReportingService.Application.Features.SalesReports.Queries.GetPaymentMethodReportQuery;
 using Pos.ReportingService.Application.Features.SalesReports.Queries.GetCashierSalesReportQuery;
@@ -264,8 +265,123 @@ public class SalesReportRepositoryAsync : ISalesReportRepositoryAsync
             rows, parameter.PageNumber, parameter.PageSize, totalCount);
     }
 
+    public async Task<PagedResponse<IEnumerable<ShiftReconciliationReportDto>>> GetShiftReconciliationReportAsync(
+    Guid tenantId,
+    GetShiftReconciliationReportQueryParameter parameter,
+    CancellationToken cancellationToken)
+    {
+        var shifts = _context.CashierShifts
+            .ApplyShiftReportFilter(tenantId, parameter.Filter);
 
-    // Helpers 
+        var query =
+            from shift in shifts
+
+            // All completed cash payments belonging to this shift.
+            let cashCollected =
+                (from payment in _context.SalePayments
+                 join sale in _context.Sales
+                     on new { payment.TenantId, Id = payment.SaleId }
+                     equals new { sale.TenantId, sale.Id }
+                 where payment.TenantId == tenantId &&
+                       sale.ShiftId == shift.Id &&
+                       payment.Status == PaymentStatuses.Completed &&
+                       payment.IsCashSnapshot
+                 select (decimal?)(payment.Amount - payment.ChangeAmount))
+                .Sum() ?? 0m
+
+            // Refunds belong to the shift that paid them.
+            let cashRefunded = _context.RefundPayments
+                .Where(payment =>
+                    payment.TenantId == tenantId &&
+                    payment.ShiftId == shift.Id &&
+                    payment.Status == PaymentStatuses.Completed &&
+                    payment.IsCashSnapshot)
+                .Sum(payment => (decimal?)payment.Amount) ?? 0m
+
+            select new ShiftReconciliationReportDto
+            {
+                ShiftId = shift.Id,
+                BranchId = shift.BranchId,
+                TerminalId = shift.TerminalId,
+                CashierUserId = shift.CashierUserId,
+                OpenedAt = shift.OpenedAt,
+                ClosedAt = shift.ClosedAt,
+                Status = shift.Status,
+                OpeningCash = shift.OpeningCash,
+                CashCollected = cashCollected,
+                CashRefunded = cashRefunded,
+
+                ExpectedCash = shift.Status == ShiftReportStatuses.Closed
+                    ? shift.ExpectedCash.Value
+                    : shift.OpeningCash + cashCollected - cashRefunded,
+
+                ClosingCash = shift.Status == ShiftReportStatuses.Closed
+                    ? shift.ClosingCash
+                    : null,
+
+                Difference = shift.Status == ShiftReportStatuses.Closed
+                    ? shift.Difference
+                    : null
+            };
+
+        var offset = ((long)parameter.PageNumber - 1) * parameter.PageSize;
+
+        if (offset > int.MaxValue)
+        {
+            return new PagedResponse<IEnumerable<ShiftReconciliationReportDto>>(
+                Array.Empty<ShiftReconciliationReportDto>(),
+                parameter.PageNumber,
+                parameter.PageSize,
+                await query.CountAsync(cancellationToken));
+        }
+
+        var rows = await query.ApplyOrder(parameter)
+            .Skip((int)offset)
+            .Take(parameter.PageSize)
+            .ToListAsync(cancellationToken);
+
+        // A nonempty short page or empty first page reveals the total.
+        var totalCountIsKnown =
+            (rows.Count > 0 && rows.Count < parameter.PageSize) ||
+            (rows.Count == 0 && offset == 0);
+
+        var totalCount = totalCountIsKnown
+            ? checked((int)(offset + rows.Count))
+            : await query.CountAsync(cancellationToken);
+
+        // Fetch names only for branches present on this page.
+        if (rows.Count > 0)
+        {
+            var branchIds = rows
+                .Select(row => row.BranchId)
+                .Distinct()
+                .ToList();
+
+            var branchNames = await _context.Branches
+                .Where(branch =>
+                    branch.TenantId == tenantId &&
+                    branchIds.Contains(branch.Id))
+                .ToDictionaryAsync(
+                    branch => branch.Id,
+                    branch => branch.NameEn,
+                    cancellationToken);
+
+            foreach (var row in rows)
+            {
+                row.BranchName = branchNames.GetValueOrDefault(row.BranchId)
+                    ?? $"Unavailable branch ({row.BranchId})";
+            }
+        }
+
+        return new PagedResponse<IEnumerable<ShiftReconciliationReportDto>>(
+            rows,
+            parameter.PageNumber,
+            parameter.PageSize,
+            totalCount);
+    }
+
+
+    // Helpers to build the reports 
 
     private IQueryable<BranchSalesReportDto> BuildBranchSalesReportQuery(Guid tenantId, SalesReportFilter filter)
     {
@@ -498,4 +614,5 @@ public class SalesReportRepositoryAsync : ISalesReportRepositoryAsync
         public decimal SalesTaxTotal { get; set; }
         public decimal ReturnAmount { get; set; }
     }
+    
 }

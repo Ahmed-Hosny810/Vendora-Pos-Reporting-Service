@@ -1,3 +1,4 @@
+using Pos.ReportingService.Application.Features.SalesReports.Queries.GetShiftReconciliationReportQuery;
 using Pos.ReportingService.Application.Features.SalesReports.Queries.GetReturnsRefundsReportQuery;
 using Pos.ReportingService.Application.Features.SalesReports.Queries.GetPaymentMethodReportQuery;
 using Pos.ReportingService.Application.Features.SalesReports.Queries.GetCashierSalesReportQuery;
@@ -24,4 +25,6 @@ public interface ISalesReportRepositoryAsync
         Guid tenantId, GetPaymentMethodReportQueryParameter parameter, CancellationToken cancellationToken);
     Task<PagedResponse<IEnumerable<ReturnsRefundsReportDto>>> GetReturnsRefundsReportAsync(
         Guid tenantId, GetReturnsRefundsReportQueryParameter parameter, CancellationToken cancellationToken);
+    Task<PagedResponse<IEnumerable<ShiftReconciliationReportDto>>> GetShiftReconciliationReportAsync(
+        Guid tenantId, GetShiftReconciliationReportQueryParameter parameter, CancellationToken cancellationToken);
 }
