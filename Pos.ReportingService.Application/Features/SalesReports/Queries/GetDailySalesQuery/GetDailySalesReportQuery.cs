@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using Pos.ReportingService.Application.Features.SalesReports.DTOs;
 using Pos.ReportingService.Application.Features.SalesReports.Parameters;
 using Pos.ReportingService.Application.Interfaces.Repositories;
@@ -9,7 +9,7 @@ namespace Pos.ReportingService.Application.Features.SalesReports.Queries.GetDail
 {
     public class GetDailySalesReportQuery:IRequest<Result<IReadOnlyList<DailySalesReportDto>>>
     {
-        public SalesReportFilter Filter { get; set; } = new();
+        public DailySalesReportFilter Filter { get; set; } = new();
     }
     public class GetDailySalesReportQueryHandler : IRequestHandler<GetDailySalesReportQuery, Result<IReadOnlyList<DailySalesReportDto>>>
     {

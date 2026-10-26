@@ -61,7 +61,7 @@ public class ReportsController : ControllerBase
     }
     [HttpGet("daily-sales")]
     public async Task<ActionResult<Response<IReadOnlyList<DailySalesReportDto>>>> GetDailySalesReport(
-        [FromQuery] SalesReportFilter filter, CancellationToken cancellationToken)
+        [FromQuery] DailySalesReportFilter filter, CancellationToken cancellationToken)
     {
         try
         {

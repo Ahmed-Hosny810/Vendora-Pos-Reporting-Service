@@ -10,7 +10,7 @@ namespace Pos.ReportingService.Application.Features.SalesReports.Queries.ExportD
 
 public class ExportDailySalesReportQuery : IRequest<Result<ReportExportResult>>
 {
-    public SalesReportFilter Filter { get; set; } = new();
+    public DailySalesReportFilter Filter { get; set; } = new();
 }
 
 public class ExportDailySalesReportQueryHandler : IRequestHandler<ExportDailySalesReportQuery, Result<ReportExportResult>>

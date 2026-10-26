@@ -1,3 +1,4 @@
+using Pos.ReportingService.Infrastructure.Persistence.Services;
 using Pos.ReportingService.Application.Features.SalesReports.Queries.GetShiftReconciliationReportQuery;
 using Pos.ReportingService.Application.Features.SalesReports.Queries.GetReturnsRefundsReportQuery;
 using Pos.ReportingService.Application.Features.SalesReports.Queries.GetPaymentMethodReportQuery;
@@ -18,21 +19,29 @@ namespace Pos.ReportingService.Infrastructure.Persistence.Repositories;
 public class SalesReportRepositoryAsync : ISalesReportRepositoryAsync
 {
     private readonly ApplicationDbContext _context;
-    public SalesReportRepositoryAsync(ApplicationDbContext context) { _context = context; }
+    private readonly ReportingTimeZone _reportingTimeZone;
+    public SalesReportRepositoryAsync(ApplicationDbContext context, ReportingTimeZone reportingTimeZone)
+    {
+        _context = context;
+        _reportingTimeZone = reportingTimeZone;
+    }
 
-    public Task<IReadOnlyList<DailySalesReportDto>> GetDailySalesReportAsync(Guid tenantId, SalesReportFilter filter, CancellationToken cancellationToken)
+    public Task<IReadOnlyList<DailySalesReportDto>> GetDailySalesReportAsync(Guid tenantId, DailySalesReportFilter filter, CancellationToken cancellationToken)
         => BuildDailySalesAsync(tenantId, filter, int.MaxValue, cancellationToken);
 
-    public Task<IReadOnlyList<DailySalesReportDto>> GetDailySalesForExportAsync(Guid tenantId, SalesReportFilter filter, int maxRows, CancellationToken cancellationToken)
+    public Task<IReadOnlyList<DailySalesReportDto>> GetDailySalesForExportAsync(Guid tenantId, DailySalesReportFilter filter, int maxRows, CancellationToken cancellationToken)
         => BuildDailySalesAsync(tenantId, filter, checked(maxRows + 1), cancellationToken);
 
-    private async Task<IReadOnlyList<DailySalesReportDto>> BuildDailySalesAsync(Guid tenantId, SalesReportFilter filter, int limit, CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<DailySalesReportDto>> BuildDailySalesAsync(Guid tenantId, DailySalesReportFilter filter, int limit, CancellationToken cancellationToken)
     {
-        // 1) Sales: one row per day
+        var utcFilter = _reportingTimeZone.ToUtcFilter(filter);
+        var sqlTimeZoneId = _reportingTimeZone.SqlTimeZoneId;
+        // Keep filtering on UTC columns; convert only the grouping expression.
+        // 1) Sales: one row per business day
         var salesByDate= await _context.Sales
             .AsNoTracking()
-            .ApplySalesFilter(tenantId,filter)
-            .GroupBy(s=>s.CompletedAt!.Value.Date)
+            .ApplySalesFilter(tenantId,utcFilter)
+            .GroupBy(s => EF.Functions.AtTimeZone(EF.Functions.AtTimeZone(s.CompletedAt!.Value, "UTC"), sqlTimeZoneId).Date)
             .Select(g=>new
             {
                 Date=g.Key,
@@ -47,8 +56,8 @@ public class SalesReportRepositoryAsync : ISalesReportRepositoryAsync
         // 2) Returns: one row per day, aggregated in SQL
         var returnsByDate = await _context.Returns
             .AsNoTracking()
-            .ApplyReturnsFilter(_context.Sales, tenantId, filter)
-            .GroupBy(r => r.CompletedAt.Date)
+            .ApplyReturnsFilter(_context.Sales, tenantId, utcFilter)
+            .GroupBy(r => EF.Functions.AtTimeZone(EF.Functions.AtTimeZone(r.CompletedAt, "UTC"), sqlTimeZoneId).Date)
             .Select(g => new { Date = g.Key, Amount = g.Sum(r => r.RefundAmount) })
             .OrderBy(x => x.Date).Take(limit)
             .ToDictionaryAsync(x => x.Date, x => x.Amount, cancellationToken);

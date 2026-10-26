@@ -14,7 +14,7 @@ public interface ISalesReportRepositoryAsync
 {
     Task<SalesDashboardDto> GetDashboardAsync(Guid tenantId, SalesReportFilter filter, CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<DailySalesReportDto>> GetDailySalesReportAsync(Guid tenantId, SalesReportFilter filter, CancellationToken cancellationToken);
+    Task<IReadOnlyList<DailySalesReportDto>> GetDailySalesReportAsync(Guid tenantId, DailySalesReportFilter filter, CancellationToken cancellationToken);
     Task<PagedResponse<IEnumerable<ProductSalesReportDto>>> GetProductSalesReportAsync(
         Guid tenantId, GetProductSalesReportQueryParameter parameter, CancellationToken cancellationToken);
     Task<PagedResponse<IEnumerable<BranchSalesReportDto>>> GetBranchSalesReportAsync(
@@ -40,5 +40,5 @@ public interface ISalesReportRepositoryAsync
     Task<IReadOnlyList<ShiftReconciliationReportDto>> GetShiftReconciliationForExportAsync(
         Guid tenantId, GetShiftReconciliationReportQueryParameter parameter, int maxRows, CancellationToken cancellationToken);
     Task<IReadOnlyList<DailySalesReportDto>> GetDailySalesForExportAsync(
-        Guid tenantId, SalesReportFilter filter, int maxRows, CancellationToken cancellationToken);
+        Guid tenantId, DailySalesReportFilter filter, int maxRows, CancellationToken cancellationToken);
 }

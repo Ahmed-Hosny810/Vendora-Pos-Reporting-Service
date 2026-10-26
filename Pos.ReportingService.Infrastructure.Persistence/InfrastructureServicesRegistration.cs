@@ -1,3 +1,5 @@
+using Pos.ReportingService.Infrastructure.Persistence.Options;
+using Pos.ReportingService.Infrastructure.Persistence.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,6 +16,12 @@ namespace Pos.ReportingService.Infrastructure.Persistence
         public static IServiceCollection AddPersistenceServices(this IServiceCollection services,
             IConfiguration configuration)
         {
+            services.AddOptions<ReportingOptions>()
+                .Bind(configuration.GetSection("Reporting"))
+                .Validate(options => ReportingTimeZone.IsValidId(options.BusinessTimeZoneId),
+                    "Reporting:BusinessTimeZoneId must identify a supported named timezone.")
+                .ValidateOnStart();
+            services.AddSingleton<ReportingTimeZone>();
             services.AddDbContext<ApplicationDbContext>(options =>
                     options.UseSqlServer(
                         configuration.GetConnectionString("DefaultConnection"),
