@@ -11,4 +11,9 @@ public interface IInventoryReportRepositoryAsync
         Guid tenantId, GetCurrentInventoryReportQueryParameter parameter, CancellationToken cancellationToken);
     Task<PagedResponse<IEnumerable<LowStockReportDto>>> GetLowStockReportAsync(
         Guid tenantId, GetLowStockReportQueryParameter parameter, CancellationToken cancellationToken);
+    Task<IReadOnlyList<CurrentInventoryReportDto>> GetCurrentInventoryForExportAsync(
+        Guid tenantId, CurrentInventoryReportFilter filter, CurrentInventoryOrderKey orderKey,
+        bool orderDescending, int maxRows, CancellationToken cancellationToken);
+    Task<IReadOnlyList<LowStockReportDto>> GetLowStockForExportAsync(
+        Guid tenantId, GetLowStockReportQueryParameter parameter, int maxRows, CancellationToken cancellationToken);
 }

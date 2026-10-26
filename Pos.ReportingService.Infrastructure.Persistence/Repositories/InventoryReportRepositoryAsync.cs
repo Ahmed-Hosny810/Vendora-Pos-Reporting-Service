@@ -21,21 +21,7 @@ public class InventoryReportRepositoryAsync : IInventoryReportRepositoryAsync
     public async Task<PagedResponse<IEnumerable<CurrentInventoryReportDto>>> GetCurrentInventoryReportAsync(
         Guid tenantId, GetCurrentInventoryReportQueryParameter parameter, CancellationToken cancellationToken)
     {
-        var query = _context.StockBalances
-            .AsNoTracking()
-            .ApplyInventoryFilter(tenantId, parameter.Filter)
-            .Select(balance => new CurrentInventoryReportDto
-            {
-                StockBalanceId = balance.Id,
-                BranchId = balance.BranchId,
-                ProductId = balance.ProductId,
-                ProductVariantId = balance.ProductVariantId,
-                QuantityOnHand = balance.QuantityOnHand,
-                QuantityReserved = balance.QuantityReserved,
-                QuantityAvailable = balance.QuantityOnHand - balance.QuantityReserved,
-                LowStockThreshold = balance.LowStockThreshold,
-                UpdatedAt = balance.UpdatedAt
-            });
+        var query = BuildCurrentInventoryQuery(tenantId, parameter.Filter);
 
         var offset = ((long)parameter.PageNumber - 1) * parameter.PageSize;
 
@@ -165,5 +151,76 @@ public class InventoryReportRepositoryAsync : IInventoryReportRepositoryAsync
                 row.DetectedAt = alert.DetectedAt;
             }
         }
+    }
+    private IQueryable<CurrentInventoryReportDto> BuildCurrentInventoryQuery(
+        Guid tenantId, CurrentInventoryReportFilter filter)
+    {
+        return _context.StockBalances
+            .AsNoTracking()
+            .ApplyInventoryFilter(tenantId, filter)
+            .Select(balance => new CurrentInventoryReportDto
+            {
+                StockBalanceId = balance.Id,
+                BranchId = balance.BranchId,
+                ProductId = balance.ProductId,
+                ProductVariantId = balance.ProductVariantId,
+                QuantityOnHand = balance.QuantityOnHand,
+                QuantityReserved = balance.QuantityReserved,
+                QuantityAvailable = balance.QuantityOnHand - balance.QuantityReserved,
+                LowStockThreshold = balance.LowStockThreshold,
+                UpdatedAt = balance.UpdatedAt
+            });
+    }
+
+    public async Task<IReadOnlyList<CurrentInventoryReportDto>> GetCurrentInventoryForExportAsync(
+        Guid tenantId, CurrentInventoryReportFilter filter, CurrentInventoryOrderKey orderKey,
+        bool orderDescending, int maxRows, CancellationToken cancellationToken)
+    {
+        var parameter = new GetCurrentInventoryReportQueryParameter
+        {
+            Filter = filter,
+            OrderKey = orderKey,
+            OrderDescending = orderDescending
+        };
+        var rows = await BuildCurrentInventoryQuery(tenantId, filter)
+            .ApplyOrder(parameter).Take(checked(maxRows + 1)).ToListAsync(cancellationToken);
+
+        // One extra row detects oversized exports without a count query or silent truncation.
+        if (rows.Count > maxRows)
+            return rows;
+
+        foreach (var batch in rows.Chunk(50))
+            await AddNamesAsync(tenantId, batch, cancellationToken);
+
+        return rows;
+    }
+    public async Task<IReadOnlyList<LowStockReportDto>> GetLowStockForExportAsync(
+        Guid tenantId, GetLowStockReportQueryParameter parameter, int maxRows, CancellationToken cancellationToken)
+    {
+        var query = _context.StockBalances
+            .AsNoTracking()
+            .ApplyLowStockFilter(tenantId, parameter.Filter)
+            .Select(balance => new LowStockReportDto
+            {
+                StockBalanceId = balance.Id,
+                BranchId = balance.BranchId,
+                ProductId = balance.ProductId,
+                ProductVariantId = balance.ProductVariantId,
+                QuantityOnHand = balance.QuantityOnHand,
+                QuantityReserved = balance.QuantityReserved,
+                QuantityAvailable = balance.QuantityOnHand - balance.QuantityReserved,
+                LowStockThreshold = balance.LowStockThreshold,
+                UpdatedAt = balance.UpdatedAt
+            });
+        var rows = await query.ApplyOrder(parameter).Take(checked(maxRows + 1)).ToListAsync(cancellationToken);
+        if (rows.Count > maxRows)
+            return rows;
+        foreach (var batch in rows.Chunk(50))
+        {
+            await AddNamesAsync(tenantId, batch, cancellationToken);
+            await AddActiveAlertsAsync(tenantId, batch.ToList(), cancellationToken);
+        }
+
+        return rows;
     }
 }

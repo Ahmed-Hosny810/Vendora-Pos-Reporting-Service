@@ -1,3 +1,14 @@
+using Pos.ReportingService.Application.Features.SalesReports.Queries.ExportSalesDashboardReportQuery;
+using Pos.ReportingService.Application.Features.SalesReports.Queries.ExportDailySalesReportQuery;
+using Pos.ReportingService.Application.Features.InventoryReports.Queries.ExportLowStockReportQuery;
+using Pos.ReportingService.Application.Features.SalesReports.Queries.ExportShiftReconciliationReportQuery;
+using Pos.ReportingService.Application.Features.SalesReports.Queries.ExportReturnsRefundsReportQuery;
+using Pos.ReportingService.Application.Features.SalesReports.Queries.ExportPaymentMethodReportQuery;
+using Pos.ReportingService.Application.Features.SalesReports.Queries.ExportCashierSalesReportQuery;
+using Pos.ReportingService.Application.Features.SalesReports.Queries.ExportBranchSalesReportQuery;
+using Pos.ReportingService.Application.Features.SalesReports.Queries.ExportProductSalesReportQuery;
+using Pos.ReportingService.Application.DTOs;
+using Pos.ReportingService.Application.Features.InventoryReports.Queries.ExportCurrentInventoryReportQuery;
 using Pos.ReportingService.Application.Features.InventoryReports.Queries.GetLowStockReportQuery;
 using Pos.ReportingService.Application.Features.InventoryReports.DTOs;
 using Pos.ReportingService.Application.Features.InventoryReports.Queries.GetCurrentInventoryReportQuery;
@@ -207,6 +218,170 @@ public class ReportsController : ControllerBase
         catch (Application.Exceptions.ValidationException exception)
         {
             return BadRequest(new Response<IEnumerable<LowStockReportDto>>(exception.Message) { Errors = exception.Errors });
+        }
+    }
+    [HttpGet("current-inventory/export")]
+    public async Task<ActionResult> ExportCurrentInventoryReport(
+        [FromQuery] ExportCurrentInventoryReportQuery query, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _mediator.Send(query, cancellationToken);
+            if (result.IsFailure)
+                return BadRequest(new Response<ReportExportResult>(string.Join(", ", result.Errors))
+                {
+                    Errors = result.Errors
+                });
+            var export = result.Value!;
+            return File(export.Content, export.ContentType, export.FileName);
+        }
+        catch (Application.Exceptions.ValidationException exception)
+        {
+            return BadRequest(new Response<ReportExportResult>(exception.Message) { Errors = exception.Errors });
+        }
+    }
+    [HttpGet("product-sales/export")]
+    public async Task<ActionResult> ExportProductSalesReport([FromQuery] ExportProductSalesReportQuery query, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _mediator.Send(query, cancellationToken);
+            if (result.IsFailure)
+                return BadRequest(new Response<ReportExportResult>(string.Join(", ", result.Errors)) { Errors = result.Errors });
+            var export = result.Value!;
+            return File(export.Content, export.ContentType, export.FileName);
+        }
+        catch (Application.Exceptions.ValidationException exception)
+        {
+            return BadRequest(new Response<ReportExportResult>(exception.Message) { Errors = exception.Errors });
+        }
+    }
+    [HttpGet("branch-sales/export")]
+    public async Task<ActionResult> ExportBranchSalesReport([FromQuery] ExportBranchSalesReportQuery query, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _mediator.Send(query, cancellationToken);
+            if (result.IsFailure)
+                return BadRequest(new Response<ReportExportResult>(string.Join(", ", result.Errors)) { Errors = result.Errors });
+            var export = result.Value!;
+            return File(export.Content, export.ContentType, export.FileName);
+        }
+        catch (Application.Exceptions.ValidationException exception)
+        {
+            return BadRequest(new Response<ReportExportResult>(exception.Message) { Errors = exception.Errors });
+        }
+    }
+    [HttpGet("cashier-sales/export")]
+    public async Task<ActionResult> ExportCashierSalesReport([FromQuery] ExportCashierSalesReportQuery query, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _mediator.Send(query, cancellationToken);
+            if (result.IsFailure)
+                return BadRequest(new Response<ReportExportResult>(string.Join(", ", result.Errors)) { Errors = result.Errors });
+            var export = result.Value!;
+            return File(export.Content, export.ContentType, export.FileName);
+        }
+        catch (Application.Exceptions.ValidationException exception)
+        {
+            return BadRequest(new Response<ReportExportResult>(exception.Message) { Errors = exception.Errors });
+        }
+    }
+    [HttpGet("payment-methods/export")]
+    public async Task<ActionResult> ExportPaymentMethodReport([FromQuery] ExportPaymentMethodReportQuery query, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _mediator.Send(query, cancellationToken);
+            if (result.IsFailure)
+                return BadRequest(new Response<ReportExportResult>(string.Join(", ", result.Errors)) { Errors = result.Errors });
+            var export = result.Value!;
+            return File(export.Content, export.ContentType, export.FileName);
+        }
+        catch (Application.Exceptions.ValidationException exception)
+        {
+            return BadRequest(new Response<ReportExportResult>(exception.Message) { Errors = exception.Errors });
+        }
+    }
+    [HttpGet("returns-refunds/export")]
+    public async Task<ActionResult> ExportReturnsRefundsReport([FromQuery] ExportReturnsRefundsReportQuery query, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _mediator.Send(query, cancellationToken);
+            if (result.IsFailure)
+                return BadRequest(new Response<ReportExportResult>(string.Join(", ", result.Errors)) { Errors = result.Errors });
+            var export = result.Value!;
+            return File(export.Content, export.ContentType, export.FileName);
+        }
+        catch (Application.Exceptions.ValidationException exception)
+        {
+            return BadRequest(new Response<ReportExportResult>(exception.Message) { Errors = exception.Errors });
+        }
+    }
+    [HttpGet("shift-reconciliation/export")]
+    public async Task<ActionResult> ExportShiftReconciliationReport([FromQuery] ExportShiftReconciliationReportQuery query, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _mediator.Send(query, cancellationToken);
+            if (result.IsFailure)
+                return BadRequest(new Response<ReportExportResult>(string.Join(", ", result.Errors)) { Errors = result.Errors });
+            var export = result.Value!;
+            return File(export.Content, export.ContentType, export.FileName);
+        }
+        catch (Application.Exceptions.ValidationException exception)
+        {
+            return BadRequest(new Response<ReportExportResult>(exception.Message) { Errors = exception.Errors });
+        }
+    }
+    [HttpGet("low-stock/export")]
+    public async Task<ActionResult> ExportLowStockReport([FromQuery] ExportLowStockReportQuery query, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _mediator.Send(query, cancellationToken);
+            if (result.IsFailure)
+                return BadRequest(new Response<ReportExportResult>(string.Join(", ", result.Errors)) { Errors = result.Errors });
+            var export = result.Value!;
+            return File(export.Content, export.ContentType, export.FileName);
+        }
+        catch (Application.Exceptions.ValidationException exception)
+        {
+            return BadRequest(new Response<ReportExportResult>(exception.Message) { Errors = exception.Errors });
+        }
+    }
+    [HttpGet("daily-sales/export")]
+    public async Task<ActionResult> ExportDailySalesReport([FromQuery] ExportDailySalesReportQuery query, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _mediator.Send(query, cancellationToken);
+            if (result.IsFailure)
+                return BadRequest(new Response<ReportExportResult>(string.Join(", ", result.Errors)) { Errors = result.Errors });
+            var export = result.Value!;
+            return File(export.Content, export.ContentType, export.FileName);
+        }
+        catch (Application.Exceptions.ValidationException exception)
+        {
+            return BadRequest(new Response<ReportExportResult>(exception.Message) { Errors = exception.Errors });
+        }
+    }
+    [HttpGet("sales-dashboard/export")]
+    public async Task<ActionResult> ExportSalesDashboardReport([FromQuery] ExportSalesDashboardReportQuery query, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _mediator.Send(query, cancellationToken);
+            if (result.IsFailure)
+                return BadRequest(new Response<ReportExportResult>(string.Join(", ", result.Errors)) { Errors = result.Errors });
+            var export = result.Value!;
+            return File(export.Content, export.ContentType, export.FileName);
+        }
+        catch (Application.Exceptions.ValidationException exception)
+        {
+            return BadRequest(new Response<ReportExportResult>(exception.Message) { Errors = exception.Errors });
         }
     }
 }

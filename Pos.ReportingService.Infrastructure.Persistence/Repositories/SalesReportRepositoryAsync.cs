@@ -20,7 +20,13 @@ public class SalesReportRepositoryAsync : ISalesReportRepositoryAsync
     private readonly ApplicationDbContext _context;
     public SalesReportRepositoryAsync(ApplicationDbContext context) { _context = context; }
 
-    public async Task<IReadOnlyList<DailySalesReportDto>> GetDailySalesReportAsync(Guid tenantId, SalesReportFilter filter, CancellationToken cancellationToken)
+    public Task<IReadOnlyList<DailySalesReportDto>> GetDailySalesReportAsync(Guid tenantId, SalesReportFilter filter, CancellationToken cancellationToken)
+        => BuildDailySalesAsync(tenantId, filter, int.MaxValue, cancellationToken);
+
+    public Task<IReadOnlyList<DailySalesReportDto>> GetDailySalesForExportAsync(Guid tenantId, SalesReportFilter filter, int maxRows, CancellationToken cancellationToken)
+        => BuildDailySalesAsync(tenantId, filter, checked(maxRows + 1), cancellationToken);
+
+    private async Task<IReadOnlyList<DailySalesReportDto>> BuildDailySalesAsync(Guid tenantId, SalesReportFilter filter, int limit, CancellationToken cancellationToken)
     {
         // 1) Sales: one row per day
         var salesByDate= await _context.Sales
@@ -35,6 +41,7 @@ public class SalesReportRepositoryAsync : ISalesReportRepositoryAsync
                 Discount = g.Sum(s => s.DiscountTotal),
                 Tax = g.Sum(s => s.TaxTotal)
             })
+            .OrderBy(x => x.Date).Take(limit)
             .ToDictionaryAsync(x => x.Date, cancellationToken);
 
         // 2) Returns: one row per day, aggregated in SQL
@@ -43,12 +50,13 @@ public class SalesReportRepositoryAsync : ISalesReportRepositoryAsync
             .ApplyReturnsFilter(_context.Sales, tenantId, filter)
             .GroupBy(r => r.CompletedAt.Date)
             .Select(g => new { Date = g.Key, Amount = g.Sum(r => r.RefundAmount) })
+            .OrderBy(x => x.Date).Take(limit)
             .ToDictionaryAsync(x => x.Date, x => x.Amount, cancellationToken);
 
 
         return salesByDate.Keys
         .Union(returnsByDate.Keys)
-        .OrderBy(d => d)
+        .OrderBy(d => d).Take(limit)
         .Select(d =>
         {
             salesByDate.TryGetValue(d, out var s);
@@ -156,26 +164,7 @@ public class SalesReportRepositoryAsync : ISalesReportRepositoryAsync
     public async Task<PagedResponse<IEnumerable<CashierSalesReportDto>>> GetCashierSalesReportAsync(
         Guid tenantId, GetCashierSalesReportQueryParameter parameter, CancellationToken cancellationToken)
     {
-
-        var sales = _context.Sales.ApplySalesFilter(tenantId, parameter.Filter);
-
-        var shifts = _context.CashierShifts.ApplyCashierFilter(tenantId, parameter.Filter);
-
-        var query =
-            from sale in sales
-            join shift in shifts
-            on new { sale.TenantId, ShiftId = sale.ShiftId }
-            equals new { shift.TenantId, ShiftId = shift.Id }
-            group sale by shift.CashierUserId into cashier
-            select new CashierSalesReportDto
-            {
-                CashierUserId = cashier.Key,
-                CurrencyCode = parameter.Filter.CurrencyCode ?? "EGP",
-                CompletedSaleCount = cashier.Count(),
-                SalesTotal = cashier.Sum(s => s.Total),
-                DiscountTotal = cashier.Sum(s => s.DiscountTotal),
-                SalesTaxTotal = cashier.Sum(s => s.TaxTotal)
-            };
+        var query = BuildCashierSalesReportQuery(tenantId, parameter);
 
         var offset = (parameter.PageNumber - 1) * parameter.PageSize;
 
@@ -270,59 +259,7 @@ public class SalesReportRepositoryAsync : ISalesReportRepositoryAsync
     GetShiftReconciliationReportQueryParameter parameter,
     CancellationToken cancellationToken)
     {
-        var shifts = _context.CashierShifts
-            .ApplyShiftReportFilter(tenantId, parameter.Filter);
-
-        var query =
-            from shift in shifts
-
-            // All completed cash payments belonging to this shift.
-            let cashCollected =
-                (from payment in _context.SalePayments
-                 join sale in _context.Sales
-                     on new { payment.TenantId, Id = payment.SaleId }
-                     equals new { sale.TenantId, sale.Id }
-                 where payment.TenantId == tenantId &&
-                       sale.ShiftId == shift.Id &&
-                       payment.Status == PaymentStatuses.Completed &&
-                       payment.IsCashSnapshot
-                 select (decimal?)(payment.Amount - payment.ChangeAmount))
-                .Sum() ?? 0m
-
-            // Refunds belong to the shift that paid them.
-            let cashRefunded = _context.RefundPayments
-                .Where(payment =>
-                    payment.TenantId == tenantId &&
-                    payment.ShiftId == shift.Id &&
-                    payment.Status == PaymentStatuses.Completed &&
-                    payment.IsCashSnapshot)
-                .Sum(payment => (decimal?)payment.Amount) ?? 0m
-
-            select new ShiftReconciliationReportDto
-            {
-                ShiftId = shift.Id,
-                BranchId = shift.BranchId,
-                TerminalId = shift.TerminalId,
-                CashierUserId = shift.CashierUserId,
-                OpenedAt = shift.OpenedAt,
-                ClosedAt = shift.ClosedAt,
-                Status = shift.Status,
-                OpeningCash = shift.OpeningCash,
-                CashCollected = cashCollected,
-                CashRefunded = cashRefunded,
-
-                ExpectedCash = shift.Status == ShiftReportStatuses.Closed
-                    ? shift.ExpectedCash.Value
-                    : shift.OpeningCash + cashCollected - cashRefunded,
-
-                ClosingCash = shift.Status == ShiftReportStatuses.Closed
-                    ? shift.ClosingCash
-                    : null,
-
-                Difference = shift.Status == ShiftReportStatuses.Closed
-                    ? shift.Difference
-                    : null
-            };
+        var query = BuildShiftReconciliationReportQuery(tenantId, parameter);
 
         var offset = ((long)parameter.PageNumber - 1) * parameter.PageSize;
 
@@ -615,4 +552,177 @@ public class SalesReportRepositoryAsync : ISalesReportRepositoryAsync
         public decimal ReturnAmount { get; set; }
     }
     
+    private IQueryable<CashierSalesReportDto> BuildCashierSalesReportQuery(
+        Guid tenantId, GetCashierSalesReportQueryParameter parameter)
+    {
+
+
+        var sales = _context.Sales.ApplySalesFilter(tenantId, parameter.Filter);
+
+        var shifts = _context.CashierShifts.ApplyCashierFilter(tenantId, parameter.Filter);
+
+        return
+            from sale in sales
+            join shift in shifts
+            on new { sale.TenantId, ShiftId = sale.ShiftId }
+            equals new { shift.TenantId, ShiftId = shift.Id }
+            group sale by shift.CashierUserId into cashier
+            select new CashierSalesReportDto
+            {
+                CashierUserId = cashier.Key,
+                CurrencyCode = parameter.Filter.CurrencyCode ?? "EGP",
+                CompletedSaleCount = cashier.Count(),
+                SalesTotal = cashier.Sum(s => s.Total),
+                DiscountTotal = cashier.Sum(s => s.DiscountTotal),
+                SalesTaxTotal = cashier.Sum(s => s.TaxTotal)
+            };
+
+    }
+    private IQueryable<ShiftReconciliationReportDto> BuildShiftReconciliationReportQuery(
+        Guid tenantId, GetShiftReconciliationReportQueryParameter parameter)
+    {
+
+        var shifts = _context.CashierShifts
+            .ApplyShiftReportFilter(tenantId, parameter.Filter);
+
+        return
+            from shift in shifts
+
+            // All completed cash payments belonging to this shift.
+            let cashCollected =
+                (from payment in _context.SalePayments
+                 join sale in _context.Sales
+                     on new { payment.TenantId, Id = payment.SaleId }
+                     equals new { sale.TenantId, sale.Id }
+                 where payment.TenantId == tenantId &&
+                       sale.ShiftId == shift.Id &&
+                       payment.Status == PaymentStatuses.Completed &&
+                       payment.IsCashSnapshot
+                 select (decimal?)(payment.Amount - payment.ChangeAmount))
+                .Sum() ?? 0m
+
+            // Refunds belong to the shift that paid them.
+            let cashRefunded = _context.RefundPayments
+                .Where(payment =>
+                    payment.TenantId == tenantId &&
+                    payment.ShiftId == shift.Id &&
+                    payment.Status == PaymentStatuses.Completed &&
+                    payment.IsCashSnapshot)
+                .Sum(payment => (decimal?)payment.Amount) ?? 0m
+
+            select new ShiftReconciliationReportDto
+            {
+                ShiftId = shift.Id,
+                BranchId = shift.BranchId,
+                TerminalId = shift.TerminalId,
+                CashierUserId = shift.CashierUserId,
+                OpenedAt = shift.OpenedAt,
+                ClosedAt = shift.ClosedAt,
+                Status = shift.Status,
+                OpeningCash = shift.OpeningCash,
+                CashCollected = cashCollected,
+                CashRefunded = cashRefunded,
+
+                ExpectedCash = shift.Status == ShiftReportStatuses.Closed
+                    ? shift.ExpectedCash.Value
+                    : shift.OpeningCash + cashCollected - cashRefunded,
+
+                ClosingCash = shift.Status == ShiftReportStatuses.Closed
+                    ? shift.ClosingCash
+                    : null,
+
+                Difference = shift.Status == ShiftReportStatuses.Closed
+                    ? shift.Difference
+                    : null
+            };
+
+    }
+    public async Task<IReadOnlyList<ProductSalesReportDto>> GetProductSalesForExportAsync(
+        Guid tenantId, GetProductSalesReportQueryParameter parameter, int maxRows, CancellationToken cancellationToken)
+    {
+        var sales = BuildProductSalesQuery(tenantId, parameter.Filter);
+        var returns = BuildProductReturnsQuery(tenantId, parameter.Filter);
+        var query = BuildProductReportQuery(sales.Concat(returns), parameter.Filter.CurrencyCode ?? "EGP");
+        var rows = await query.ApplyOrder(parameter).Take(checked(maxRows + 1)).ToListAsync(cancellationToken);
+        if (rows.Count > maxRows)
+            return rows;
+        foreach (var batch in rows.Chunk(50))
+            await AddProductNamesAsync(tenantId, batch.ToList(), cancellationToken);
+
+        return rows;
+    }
+    public async Task<IReadOnlyList<BranchSalesReportDto>> GetBranchSalesForExportAsync(
+        Guid tenantId, GetBranchSalesReportQueryParameter parameter, int maxRows, CancellationToken cancellationToken)
+    {
+        var query = BuildBranchSalesReportQuery(tenantId, parameter.Filter);
+        var rows = await query.ApplyOrder(parameter).Take(checked(maxRows + 1)).ToListAsync(cancellationToken);
+        if (rows.Count > maxRows)
+            return rows;
+        foreach (var batch in rows.Chunk(50))
+        {
+            var ids = batch.Select(x => x.BranchId).Distinct().ToList();
+            var names = await _context.Branches.Where(x => x.TenantId == tenantId && ids.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, x => x.NameEn, cancellationToken);
+            foreach (var row in batch)
+                row.BranchName = names.GetValueOrDefault(row.BranchId) ?? $"Unavailable branch ({row.BranchId})";
+        }
+
+        return rows;
+    }
+    public async Task<IReadOnlyList<CashierSalesReportDto>> GetCashierSalesForExportAsync(
+        Guid tenantId, GetCashierSalesReportQueryParameter parameter, int maxRows, CancellationToken cancellationToken)
+    {
+        var query = BuildCashierSalesReportQuery(tenantId, parameter);
+        var rows = await query.ApplyOrder(parameter).Take(checked(maxRows + 1)).ToListAsync(cancellationToken);
+        if (rows.Count > maxRows)
+            return rows;
+
+        return rows;
+    }
+    public async Task<IReadOnlyList<PaymentMethodReportDto>> GetPaymentMethodForExportAsync(
+        Guid tenantId, GetPaymentMethodReportQueryParameter parameter, int maxRows, CancellationToken cancellationToken)
+    {
+        var query = BuildPaymentMethodReportQuery(tenantId, parameter.Filter);
+        var rows = await query.ApplyOrder(parameter).Take(checked(maxRows + 1)).ToListAsync(cancellationToken);
+        if (rows.Count > maxRows)
+            return rows;
+
+        return rows;
+    }
+    public async Task<IReadOnlyList<ReturnsRefundsReportDto>> GetReturnsRefundsForExportAsync(
+        Guid tenantId, GetReturnsRefundsReportQueryParameter parameter, int maxRows, CancellationToken cancellationToken)
+    {
+        var query = BuildReturnsRefundsReportQuery(tenantId, parameter.Filter).ApplyRefundStateFilter(parameter.Filter);
+        var rows = await query.ApplyOrder(parameter).Take(checked(maxRows + 1)).ToListAsync(cancellationToken);
+        if (rows.Count > maxRows)
+            return rows;
+        foreach (var batch in rows.Chunk(50))
+        {
+            var ids = batch.Select(x => x.BranchId).Distinct().ToList();
+            var names = await _context.Branches.Where(x => x.TenantId == tenantId && ids.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, x => x.NameEn, cancellationToken);
+            foreach (var row in batch)
+                row.BranchName = names.GetValueOrDefault(row.BranchId) ?? $"Unavailable branch ({row.BranchId})";
+        }
+
+        return rows;
+    }
+    public async Task<IReadOnlyList<ShiftReconciliationReportDto>> GetShiftReconciliationForExportAsync(
+        Guid tenantId, GetShiftReconciliationReportQueryParameter parameter, int maxRows, CancellationToken cancellationToken)
+    {
+        var query = BuildShiftReconciliationReportQuery(tenantId, parameter);
+        var rows = await query.ApplyOrder(parameter).Take(checked(maxRows + 1)).ToListAsync(cancellationToken);
+        if (rows.Count > maxRows)
+            return rows;
+        foreach (var batch in rows.Chunk(50))
+        {
+            var ids = batch.Select(x => x.BranchId).Distinct().ToList();
+            var names = await _context.Branches.Where(x => x.TenantId == tenantId && ids.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, x => x.NameEn, cancellationToken);
+            foreach (var row in batch)
+                row.BranchName = names.GetValueOrDefault(row.BranchId) ?? $"Unavailable branch ({row.BranchId})";
+        }
+
+        return rows;
+    }
 }

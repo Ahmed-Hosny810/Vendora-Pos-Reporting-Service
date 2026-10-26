@@ -14,6 +14,10 @@
 
 	<ItemGroup>
 	  <Folder Include="Services\" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\Pos.ReportingService.Application\Pos.ReportingService.Application.csproj" />
 	</ItemGroup>	
 	
 </Project>

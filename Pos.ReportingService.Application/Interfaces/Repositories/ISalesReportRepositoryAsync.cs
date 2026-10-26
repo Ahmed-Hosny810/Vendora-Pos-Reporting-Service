@@ -27,4 +27,18 @@ public interface ISalesReportRepositoryAsync
         Guid tenantId, GetReturnsRefundsReportQueryParameter parameter, CancellationToken cancellationToken);
     Task<PagedResponse<IEnumerable<ShiftReconciliationReportDto>>> GetShiftReconciliationReportAsync(
         Guid tenantId, GetShiftReconciliationReportQueryParameter parameter, CancellationToken cancellationToken);
+    Task<IReadOnlyList<ProductSalesReportDto>> GetProductSalesForExportAsync(
+        Guid tenantId, GetProductSalesReportQueryParameter parameter, int maxRows, CancellationToken cancellationToken);
+    Task<IReadOnlyList<BranchSalesReportDto>> GetBranchSalesForExportAsync(
+        Guid tenantId, GetBranchSalesReportQueryParameter parameter, int maxRows, CancellationToken cancellationToken);
+    Task<IReadOnlyList<CashierSalesReportDto>> GetCashierSalesForExportAsync(
+        Guid tenantId, GetCashierSalesReportQueryParameter parameter, int maxRows, CancellationToken cancellationToken);
+    Task<IReadOnlyList<PaymentMethodReportDto>> GetPaymentMethodForExportAsync(
+        Guid tenantId, GetPaymentMethodReportQueryParameter parameter, int maxRows, CancellationToken cancellationToken);
+    Task<IReadOnlyList<ReturnsRefundsReportDto>> GetReturnsRefundsForExportAsync(
+        Guid tenantId, GetReturnsRefundsReportQueryParameter parameter, int maxRows, CancellationToken cancellationToken);
+    Task<IReadOnlyList<ShiftReconciliationReportDto>> GetShiftReconciliationForExportAsync(
+        Guid tenantId, GetShiftReconciliationReportQueryParameter parameter, int maxRows, CancellationToken cancellationToken);
+    Task<IReadOnlyList<DailySalesReportDto>> GetDailySalesForExportAsync(
+        Guid tenantId, SalesReportFilter filter, int maxRows, CancellationToken cancellationToken);
 }
