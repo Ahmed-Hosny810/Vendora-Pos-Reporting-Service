@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Pos.ReportingService.Application.Interfaces.Repositories;
@@ -25,6 +25,7 @@ namespace Pos.ReportingService.Infrastructure.Persistence
 
             services.AddScoped<IUnitOfWork, UnitOfWork>();
             services.AddScoped<ISalesReportRepositoryAsync, SalesReportRepositoryAsync>();
+            services.AddScoped<IInventoryReportRepositoryAsync, InventoryReportRepositoryAsync>();
 
             return services;
         }

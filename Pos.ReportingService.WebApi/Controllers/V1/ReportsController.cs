@@ -1,3 +1,7 @@
+using Pos.ReportingService.Application.Features.InventoryReports.Queries.GetLowStockReportQuery;
+using Pos.ReportingService.Application.Features.InventoryReports.DTOs;
+using Pos.ReportingService.Application.Features.InventoryReports.Queries.GetCurrentInventoryReportQuery;
+using Pos.SalesService.Application.Wrappers;
 using Pos.ReportingService.Application.Features.SalesReports.Queries.GetShiftReconciliationReportQuery;
 using Pos.ReportingService.Application.Features.SalesReports.Queries.GetReturnsRefundsReportQuery;
 using Pos.ReportingService.Application.Features.SalesReports.Queries.GetPaymentMethodReportQuery;
@@ -13,7 +17,6 @@ using Pos.ReportingService.Application.Features.SalesReports.Queries.GetDailySal
 using Pos.ReportingService.Application.Features.SalesReports.Queries.GetProductSalesReportQuery;
 using Pos.ReportingService.Application.Features.SalesReports.Queries.GetSalesDashboardQuery;
 using Pos.ReportingService.WebApi.Policies;
-using Pos.SalesService.Application.Wrappers;
 
 namespace Pos.ReportingService.WebApi.Controllers.V1;
 
@@ -172,6 +175,38 @@ public class ReportsController : ControllerBase
         catch (Application.Exceptions.ValidationException exception)
         {
             return BadRequest(new Response<IEnumerable<ShiftReconciliationReportDto>>(exception.Message) { Errors = exception.Errors });
+        }
+    }
+    [HttpGet("current-inventory")]
+    public async Task<ActionResult<PagedResponse<IEnumerable<CurrentInventoryReportDto>>>> GetCurrentInventoryReport(
+        [FromQuery] GetCurrentInventoryReportQueryParameter parameter, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _mediator.Send(new GetCurrentInventoryReportQuery { Parameter = parameter }, cancellationToken);
+            return result.IsSuccess
+                ? Ok(result.Value)
+                : BadRequest(new Response<IEnumerable<CurrentInventoryReportDto>>(string.Join(", ", result.Errors)) { Errors = result.Errors });
+        }
+        catch (Application.Exceptions.ValidationException exception)
+        {
+            return BadRequest(new Response<IEnumerable<CurrentInventoryReportDto>>(exception.Message) { Errors = exception.Errors });
+        }
+    }
+    [HttpGet("low-stock")]
+    public async Task<ActionResult<PagedResponse<IEnumerable<LowStockReportDto>>>> GetLowStockReport(
+        [FromQuery] GetLowStockReportQueryParameter parameter, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _mediator.Send(new GetLowStockReportQuery { Parameter = parameter }, cancellationToken);
+            return result.IsSuccess
+                ? Ok(result.Value)
+                : BadRequest(new Response<IEnumerable<LowStockReportDto>>(string.Join(", ", result.Errors)) { Errors = result.Errors });
+        }
+        catch (Application.Exceptions.ValidationException exception)
+        {
+            return BadRequest(new Response<IEnumerable<LowStockReportDto>>(exception.Message) { Errors = exception.Errors });
         }
     }
 }
