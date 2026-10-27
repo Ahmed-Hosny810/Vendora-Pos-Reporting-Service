@@ -10,4 +10,5 @@
   <Folder Name="/WebApi/">
     <Project Path="Pos.ReportingService.WebApi/Pos.ReportingService.WebApi.csproj" />
   </Folder>
+  <Project Path="Pos.ReportingService.IntegrationTests/Pos.ReportingService.IntegrationTests.csproj" />
 </Solution>

@@ -19,6 +19,13 @@ namespace Pos.ReportingService.Infrastructure.Shared
                     "CsvExport:Delimiter must be a comma or semicolon.")
                 .ValidateOnStart();
             services.AddScoped<ICsvExportService, CsvExportService>();
+            services.AddHttpClient<ICashierNameLookupService, CashierNameLookupService>(client =>
+            {
+                var baseUrl = configuration["IdentityApi:BaseUrl"]
+                    ?? throw new InvalidOperationException("Configure IdentityApi:BaseUrl.");
+                client.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
+                client.Timeout = TimeSpan.FromSeconds(10);
+            });
             return services;
         }
     }

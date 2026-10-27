@@ -15,11 +15,13 @@ public class GetCashierSalesReportQueryHandler : IRequestHandler<GetCashierSales
 {
     private readonly ISalesReportRepositoryAsync _repository;
     private readonly ICurrentUserService _currentUser;
+    private readonly ICashierNameLookupService _cashierNames;
 
-    public GetCashierSalesReportQueryHandler(ISalesReportRepositoryAsync repository, ICurrentUserService currentUser)
+    public GetCashierSalesReportQueryHandler(ISalesReportRepositoryAsync repository, ICurrentUserService currentUser, ICashierNameLookupService cashierNames)
     {
         _repository = repository;
         _currentUser = currentUser;
+        _cashierNames = cashierNames;
     }
 
     public async Task<Result<PagedResponse<IEnumerable<CashierSalesReportDto>>>> Handle(
@@ -31,6 +33,11 @@ public class GetCashierSalesReportQueryHandler : IRequestHandler<GetCashierSales
             return Result<PagedResponse<IEnumerable<CashierSalesReportDto>>>.Failure("A valid tenant is required.");
 
         var report = await _repository.GetCashierSalesReportAsync(tenantId.Value, request.Parameter, cancellationToken);
+        var names = await _cashierNames.GetNamesAsync(
+            tenantId.Value, report.Data.Select(row => row.CashierUserId).Distinct().ToArray(), cancellationToken);
+        foreach (var row in report.Data)
+            row.CashierName = names.TryGetValue(row.CashierUserId, out var name) ? name : null;
+
         return Result<PagedResponse<IEnumerable<CashierSalesReportDto>>>.Success(report);
     }
 }

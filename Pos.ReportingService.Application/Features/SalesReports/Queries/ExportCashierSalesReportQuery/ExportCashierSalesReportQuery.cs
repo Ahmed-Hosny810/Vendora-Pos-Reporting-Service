@@ -19,12 +19,14 @@ public class ExportCashierSalesReportQueryHandler : IRequestHandler<ExportCashie
 {
     private readonly ISalesReportRepositoryAsync _repository;
     private readonly ICurrentUserService _currentUser;
+    private readonly ICashierNameLookupService _cashierNames;
     private readonly ICsvExportService _csv;
 
-    public ExportCashierSalesReportQueryHandler(ISalesReportRepositoryAsync repository, ICurrentUserService currentUser, ICsvExportService csv)
+    public ExportCashierSalesReportQueryHandler(ISalesReportRepositoryAsync repository, ICurrentUserService currentUser, ICsvExportService csv, ICashierNameLookupService cashierNames)
     {
         _repository = repository;
         _currentUser = currentUser;
+        _cashierNames = cashierNames;
         _csv = csv;
     }
 
@@ -38,6 +40,11 @@ public class ExportCashierSalesReportQueryHandler : IRequestHandler<ExportCashie
         var rows = await _repository.GetCashierSalesForExportAsync(tenantId.Value, parameter, _csv.MaxRows, cancellationToken);
         if (rows.Count > _csv.MaxRows)
             return Result<ReportExportResult>.Failure($"The export exceeds {_csv.MaxRows} rows. Narrow the filters and try again.");
+
+        var names = await _cashierNames.GetNamesAsync(
+            tenantId.Value, rows.Select(row => row.CashierUserId).Distinct().ToArray(), cancellationToken);
+        foreach (var row in rows)
+            row.CashierName = names.TryGetValue(row.CashierUserId, out var name) ? name : null;
 
         string[] headers = { "Cashier User Id", "Cashier Name", "Currency Code", "Completed Sale Count", "Sales Total", "Discount Total", "Sales Tax Total" };
         var values = rows.Select(row => (IReadOnlyList<object?>)new object?[] { row.CashierUserId, row.CashierName, row.CurrencyCode, row.CompletedSaleCount, row.SalesTotal, row.DiscountTotal, row.SalesTaxTotal });

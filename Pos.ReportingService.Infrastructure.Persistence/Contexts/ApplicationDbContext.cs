@@ -35,22 +35,22 @@ public class ApplicationDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-        modelBuilder.Entity<BranchReadModel>().HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        modelBuilder.Entity<BranchReadModel>().HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.GetValueOrDefault());
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
 
-        modelBuilder.Entity<ProductReadModel>().HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
-        modelBuilder.Entity<ProductVariantReadModel>().HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        modelBuilder.Entity<ProductReadModel>().HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.GetValueOrDefault());
+        modelBuilder.Entity<ProductVariantReadModel>().HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.GetValueOrDefault());
 
         // Missing tenant context returns no data. Background jobs must use explicit tenant scoping.
-        modelBuilder.Entity<SaleReadModel>().HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
-        modelBuilder.Entity<SaleItemReadModel>().HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
-        modelBuilder.Entity<SalePaymentReadModel>().HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
-        modelBuilder.Entity<SaleReturnReadModel>().HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
-        modelBuilder.Entity<SaleReturnItemReadModel>().HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
-        modelBuilder.Entity<RefundPaymentReadModel>().HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
-        modelBuilder.Entity<CashierShiftReadModel>().HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
-        modelBuilder.Entity<StockBalanceReadModel>().HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
-        modelBuilder.Entity<LowStockAlertReadModel>().HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
-        modelBuilder.Entity<InventorySnapshot>().HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.Value);
+        modelBuilder.Entity<SaleReadModel>().HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.GetValueOrDefault());
+        modelBuilder.Entity<SaleItemReadModel>().HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.GetValueOrDefault());
+        modelBuilder.Entity<SalePaymentReadModel>().HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.GetValueOrDefault());
+        modelBuilder.Entity<SaleReturnReadModel>().HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.GetValueOrDefault());
+        modelBuilder.Entity<SaleReturnItemReadModel>().HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.GetValueOrDefault());
+        modelBuilder.Entity<RefundPaymentReadModel>().HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.GetValueOrDefault());
+        modelBuilder.Entity<CashierShiftReadModel>().HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.GetValueOrDefault());
+        modelBuilder.Entity<StockBalanceReadModel>().HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.GetValueOrDefault());
+        modelBuilder.Entity<LowStockAlertReadModel>().HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.GetValueOrDefault());
+        modelBuilder.Entity<InventorySnapshot>().HasQueryFilter(x => CurrentTenantId.HasValue && x.TenantId == CurrentTenantId.GetValueOrDefault());
     }
 }
